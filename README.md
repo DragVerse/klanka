@@ -88,3 +88,25 @@ services:
 ```bash
 docker compose -f docker-compose-image.yaml up
 ```
+
+## Set up python environment
+
+Create a new directory for the virtual environment
+```bash
+mkdir ~/python-env
+```
+
+Create a new virtual environment
+```bash
+python3 -m venv ~/python-env/eliza-build
+```
+
+Activate the virtual environment
+```bash
+source ~/python-env/eliza-build/bin/activate
+```
+
+Install setuptools in the virtual environment
+```bash
+pip install setuptools
+```

@@ -7,7 +7,7 @@ import {
   type Character,
 } from "@elizaos/core";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
-import { createNodePlugin } from "@elizaos/plugin-node";
+import { createNodePlugin, } from "@elizaos/plugin-node";
 import { solanaPlugin } from "@elizaos/plugin-solana";
 import fs from "fs";
 import net from "net";
@@ -27,7 +27,7 @@ import { initializeDatabase } from "./database/index.ts";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const wait = (minTime: number = 1000, maxTime: number = 3000) => {
+export const wait = (minTime = 1000, maxTime = 3000) => {
   const waitTime =
     Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime;
   return new Promise((resolve) => setTimeout(resolve, waitTime));
@@ -74,6 +74,9 @@ async function startAgent(character: Character, directClient: DirectClient) {
     character.username ??= character.name;
 
     const token = getTokenForProvider(character.modelProvider, character);
+    const ollamaConfig = character.modelProvider === "ollama" 
+        ? token as { baseUrl: string; model: string } 
+        : token;
     const dataDir = path.join(__dirname, "../data");
 
     if (!fs.existsSync(dataDir)) {
@@ -85,7 +88,14 @@ async function startAgent(character: Character, directClient: DirectClient) {
     await db.init();
 
     const cache = initializeDbCache(character, db);
-    const runtime = createAgent(character, db, cache, token);
+    const runtime = createAgent(
+      character, 
+      db, 
+      cache, 
+      character.modelProvider === "ollama" 
+        ? (token as { baseUrl: string }).baseUrl 
+        : token as string
+    );
 
     await runtime.initialize();
 
@@ -95,6 +105,11 @@ async function startAgent(character: Character, directClient: DirectClient) {
 
     // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
+
+    if (character.modelProvider === "ollama" && !(token as { model: string }).model.includes("deepseek")) {
+        elizaLogger.error("Invalid Ollama model configured:", (token as { model: string }).model);
+        process.exit(1);
+    }
 
     return runtime;
   } catch (error) {
@@ -128,10 +143,10 @@ const checkPortAvailable = (port: number): Promise<boolean> => {
 
 const startAgents = async () => {
   const directClient = new DirectClient();
-  let serverPort = parseInt(settings.SERVER_PORT || "3000");
+  let serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
   const args = parseArguments();
 
-  let charactersArg = args.characters || args.character;
+  const charactersArg = args.characters || args.character;
   let characters = [character];
 
   console.log("charactersArg", charactersArg);
@@ -160,7 +175,7 @@ const startAgents = async () => {
 
   directClient.start(serverPort);
 
-  if (serverPort !== parseInt(settings.SERVER_PORT || "3000")) {
+  if (serverPort !== Number.parseInt(settings.SERVER_PORT || "3000")) {
     elizaLogger.log(`Server started on alternate port ${serverPort}`);
   }
 

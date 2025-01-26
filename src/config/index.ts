@@ -1,5 +1,4 @@
-
-import { Character, ModelProviderName, settings, validateCharacterConfig } from "@elizaos/core";
+import { type Character, ModelProviderName, settings, validateCharacterConfig } from "@elizaos/core";
 import fs from "fs";
 import path from "path";
 import yargs from "yargs";
@@ -28,7 +27,7 @@ export function parseArguments(): {
 export async function loadCharacters(
   charactersArg: string
 ): Promise<Character[]> {
-  let characterPaths = charactersArg?.split(",").map((filePath) => {
+  const characterPaths = charactersArg?.split(",").map((filePath) => {
     if (path.basename(filePath) === filePath) {
       filePath = "../characters/" + filePath;
     }
@@ -99,5 +98,37 @@ export function getTokenForProvider(
       );
     case ModelProviderName.GROQ:
       return character.settings?.secrets?.GROQ_API_KEY || settings.GROQ_API_KEY;
+    case ModelProviderName.OLLAMA:
+      return {
+        baseUrl: process.env.OLLAMA_HOST || 'http://localhost:11434',
+        model: character.settings?.secrets?.MODEL_NAME || "deepseek-r1:1.5b",
+        options: {
+          raw: true
+        },
+        parse: createOllamaParser().parse
+      };
   }
+}
+
+function createOllamaParser() {
+  return {
+    parse: (response: string) => {
+      try {
+        const jsonMatch = response.match(/\{.*\}/s);
+        if (!jsonMatch) throw new Error("No JSON found in response");
+        
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          ...parsed,
+          done: true,
+          eval_count: parsed.eval_count || 0,
+          eval_duration: parsed.eval_duration || 0,
+          total_duration: parsed.total_duration || 0
+        };
+      } catch (e) {
+        console.error("Failed to parse Ollama response:", response);
+        throw e;
+      }
+    }
+  };
 }

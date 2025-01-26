@@ -26,4 +26,6 @@ services:
             - SERVER_PORT=3000
         ports:
             - "3000:3000"
+            - "11434:11434"
         restart: always
+        network_mode: "host"
